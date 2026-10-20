@@ -13,6 +13,9 @@ export function getDefaultModelOptions(modelName: string, providerType: Provider
   thinking?: { type: "adaptive" | "enabled" };
 } {
   const options = { max_tokens: 16 * 1024 };
+  if (modelName === "MiniMax-M3.1-Flash") {
+    return { ...options, thinking: { type: "adaptive" } };
+  }
   if (modelName === "MiniMax-M3") {
     return providerType === "openai" ? { ...options, thinking: { type: "adaptive" } } : options;
   }
@@ -38,28 +41,28 @@ export const MODEL_PROVIDERS: ModelProviderConfig[] = [
     id: "minimax_cn",
     baseURL: "https://api.minimaxi.com/v1",
     providerType: "openai",
-    defaultModelName: "MiniMax-M3",
+    defaultModelName: "MiniMax-M3.1-Flash",
   },
   {
     label: "MiniMax (Global)",
     id: "minimax_global",
     baseURL: "https://api.minimax.io/v1",
     providerType: "openai",
-    defaultModelName: "MiniMax-M3",
+    defaultModelName: "MiniMax-M3.1-Flash",
   },
   {
     label: "MiniMax Anthropic (Domestic)",
     id: "minimax_anthropic_cn",
     baseURL: "https://api.minimaxi.com/anthropic",
     providerType: "anthropic",
-    defaultModelName: "MiniMax-M3",
+    defaultModelName: "MiniMax-M3.1-Flash",
   },
   {
     label: "MiniMax Anthropic (Global)",
     id: "minimax_anthropic_global",
     baseURL: "https://api.minimax.io/anthropic",
     providerType: "anthropic",
-    defaultModelName: "MiniMax-M3",
+    defaultModelName: "MiniMax-M3.1-Flash",
   },
   { label: "GLM (Zhipu AI)", id: "glm", baseURL: "https://open.bigmodel.cn/api/paas/v4", providerType: "openai" },
   { label: "Kimi (Moonshot)", id: "kimi", baseURL: "https://api.moonshot.cn/v1", providerType: "openai" },
