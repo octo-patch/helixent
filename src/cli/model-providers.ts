@@ -11,10 +11,14 @@ export type ModelProviderConfig = {
 export function getDefaultModelOptions(modelName: string, providerType: ProviderType): {
   max_tokens: number;
   thinking?: { type: "adaptive" | "enabled" };
+  reasoning_effort?: "max";
+  output_config?: { effort: "max" };
 } {
   const options = { max_tokens: 16 * 1024 };
   if (modelName === "MiniMax-M3.1-Flash") {
-    return { ...options, thinking: { type: "adaptive" } };
+    return providerType === "openai"
+      ? { ...options, thinking: { type: "adaptive" }, reasoning_effort: "max" }
+      : { ...options, thinking: { type: "adaptive" }, output_config: { effort: "max" } };
   }
   if (modelName === "MiniMax-M3") {
     return providerType === "openai" ? { ...options, thinking: { type: "adaptive" } } : options;

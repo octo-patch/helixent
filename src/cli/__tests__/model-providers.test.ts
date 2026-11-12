@@ -4,7 +4,7 @@ import { OpenAI } from "openai";
 
 import { AnthropicModelProvider } from "@/community/anthropic";
 import { OpenAIModelProvider } from "@/community/openai";
-import { type Message, Model } from "@/foundation";
+import { Model, type NonSystemMessage } from "@/foundation";
 
 import { helixentConfigSchema } from "../config";
 import { getDefaultModelOptions, MODEL_PROVIDERS } from "../model-providers";
@@ -16,7 +16,7 @@ const MINIMAX_PROVIDERS = [
   { id: "minimax_anthropic_global", baseURL: "https://api.minimax.io/anthropic", providerType: "anthropic" },
 ] as const;
 
-const HISTORY: Message[] = [
+const HISTORY: NonSystemMessage[] = [
   {
     role: "user",
     content: [
@@ -61,10 +61,11 @@ describe("MiniMax providers", () => {
 
   test("preserve protocol-specific M3, legacy and custom defaults", () => {
     for (const protocol of ["openai", "anthropic"] as const) {
-      expect(getDefaultModelOptions("MiniMax-M3.1-Flash", protocol)).toEqual({
-        max_tokens: 16 * 1024,
-        thinking: { type: "adaptive" },
-      });
+      expect(getDefaultModelOptions("MiniMax-M3.1-Flash", protocol)).toEqual(
+        protocol === "openai"
+          ? { max_tokens: 16 * 1024, thinking: { type: "adaptive" }, reasoning_effort: "max" }
+          : { max_tokens: 16 * 1024, thinking: { type: "adaptive" }, output_config: { effort: "max" } },
+      );
       expect(getDefaultModelOptions("MiniMax-M2.7", protocol)).toEqual({ max_tokens: 16 * 1024 });
       expect(getDefaultModelOptions("custom-model", protocol)).toEqual({
         max_tokens: 16 * 1024,
@@ -94,10 +95,15 @@ describe("MiniMax providers", () => {
           const anthropic = entry.provider === "anthropic";
           let requestURL = "";
           let body: Record<string, unknown> = {};
-          const fetchRequest = async (input: RequestInfo | URL, init?: RequestInit) => {
-            const request = new Request(input, init);
+          const fetchRequest = async (input: string | URL | Request, init?: RequestInit) => {
+            const request =
+              typeof input === "string"
+                ? new Request(input, init)
+                : input instanceof URL
+                  ? new Request(input.toString(), init)
+                  : new Request(input, init);
             requestURL = request.url;
-            body = await request.json();
+            body = (await request.json()) as Record<string, unknown>;
             if (stream) {
               return new Response(
                 anthropic ? 'event: message_stop\ndata: {"type":"message_stop"}\n\n' : "data: [DONE]\n\n",
@@ -134,11 +140,11 @@ describe("MiniMax providers", () => {
           const model = new Model(modelName, provider, options);
           const messages = structuredClone(HISTORY);
           if (stream) {
-            for await (const message of model.stream({ messages })) {
+            for await (const message of model.stream({ prompt: "", messages })) {
               expect(message.role).toBe("assistant");
             }
           } else {
-            await model.invoke({ messages });
+            await model.invoke({ prompt: "", messages });
           }
 
           expect(requestURL).toBe(`${expected.baseURL}${anthropic ? "/v1/messages" : "/chat/completions"}`);
@@ -158,8 +164,9 @@ describe("MiniMax providers", () => {
           } else {
             expect(body.thinking).toMatchObject({ type: "enabled" });
           }
-          expect(body.reasoning_effort).toBe(anthropic ? undefined : effort);
-          expect(body.output_config).toEqual(anthropic && effort ? { effort } : undefined);
+          const expectedEffort = effort ?? (modelName === "MiniMax-M3.1-Flash" ? "max" : undefined);
+          expect(body.reasoning_effort).toBe(anthropic ? undefined : expectedEffort);
+          expect(body.output_config).toEqual(anthropic && expectedEffort ? { effort: expectedEffort } : undefined);
           const wireHistory = JSON.stringify(body.messages);
           for (const value of ["Prior reasoning", "call_test", "inspect", "Image inspected", "https://example.com/image.png", "Continue"]) {
             expect(wireHistory).toContain(value);
